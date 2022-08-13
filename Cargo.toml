@@ -1,0 +1,13 @@
+[package]
+name = "cargo-docket"
+version = "0.0.1"
+edition = "2021"
+authors = ["OliveIsAWord <89336634+OliveIsAWord@users.noreply.github.com>"]
+license = "MIT OR Apache-2.0"
+description = "A tool for organizing project tasks."
+readme = "README.md"
+repository = "https://github.com/OliveIsAWord/cargo-docket"
+keywords = ["cli", "todo"]
+categories = ["command-line-utilities"]
+
+[dependencies]
