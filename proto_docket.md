@@ -7,7 +7,8 @@
 
 # Subcommands/Actions
 - [x] new docket
-- [ ] delete docket
+- [x] delete docket
+- [ ] format docket
 - [ ] edit docket
 - [ ] print docket
 - [ ] pick random item from docket
@@ -16,4 +17,4 @@
 
 # Features
 - [x] Pretty clap-like error printing
-- [ ] nice user input functions (e.g. `blah blah blah? [Y/n]`)
+- [x] nice user input functions (e.g. `blah blah blah? [Y/n]`)

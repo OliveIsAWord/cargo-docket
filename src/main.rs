@@ -7,8 +7,8 @@ mod cute_error;
 use clap::{Parser, Subcommand};
 use std::env;
 use std::ffi::OsString;
-use std::fs::File;
-use std::io::{self, Write};
+use std::fs::{remove_file, File};
+use std::io::{self, BufRead, Write};
 use std::iter::once;
 use std::process::ExitCode;
 
@@ -38,6 +38,8 @@ enum Action {
     Meow,
     /// Create new docket file.
     New,
+    /// Delete current docket file.
+    Delete,
 }
 
 fn main() -> ExitCode {
@@ -69,11 +71,12 @@ fn main() -> ExitCode {
     };
     debug_println!("done parsing: {:?}", args);
     match args.action.unwrap_or(DEFAULT_ACTION) {
-        Action::New => action_new(),
         Action::Meow => {
             println!("Meow!");
             ExitCode::SUCCESS
         }
+        Action::New => action_new(),
+        Action::Delete => action_delete(),
     }
 }
 
@@ -89,7 +92,9 @@ fn action_new() -> ExitCode {
             try_yeet!(write_new_docket(&mut f));
             ExitCode::SUCCESS
         }
-        Err(io::ErrorKind::AlreadyExists) => yeet!("docket.md already exists in this directory"),
+        Err(io::ErrorKind::AlreadyExists) => {
+            yeet!(DOCKET_PATH, " already exists in this directory")
+        }
         Err(e) => yeet!(e),
     }
 }
@@ -101,4 +106,53 @@ where
     writeln!(w, "{}", PRELUDE)?;
     writeln!(w, "{}", TEMPLATE)?;
     w.flush()
+}
+
+fn action_delete() -> ExitCode {
+    debug_println!("ACTION: delete");
+    match yes_no(&format!("Permanently delete {}?", DOCKET_PATH), Some(false)) {
+        Ok(true) => (),
+        Ok(false) => return ExitCode::SUCCESS,
+        Err(e) => yeet!(e),
+    };
+    match remove_file(DOCKET_PATH).map_err(|e| e.kind()) {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(io::ErrorKind::NotFound) => {
+            yeet!(DOCKET_PATH, " does not exist in this directory")
+        }
+        Err(e) => yeet!(e),
+    }
+}
+
+fn yes_no(msg: &str, default_answer: Option<bool>) -> io::Result<bool> {
+    let mut stdout = io::stdout().lock();
+    let mut stderr = io::stderr().lock();
+    let mut stdin = io::stdin().lock();
+    let prompt = match default_answer {
+        Some(true) => "Y/n",
+        Some(false) => "y/N",
+        None => "y/n",
+    };
+    // I don't know if this is standard, but we only print the question a certain number of times
+    // before giving up and throwing an error.
+    let max_trys = 3;
+    let mut buffer = String::new();
+    for _ in 0..max_trys {
+        write!(stdout, "{} [{}] ", msg, prompt)?;
+        stdout.flush()?;
+        buffer.clear();
+        stdin.read_line(&mut buffer)?;
+        let mut c = buffer.trim_start().chars().next();
+        c.as_mut().map(char::make_ascii_lowercase);
+        match c {
+            Some('y') => return Ok(true),
+            Some('n') => return Ok(false),
+            Some(_) => writeln!(stderr, "unrecognized character")?,
+            None => match default_answer {
+                Some(answer) => return Ok(answer),
+                None => (),
+            },
+        }
+    }
+    Err(io::ErrorKind::TimedOut.into())
 }
