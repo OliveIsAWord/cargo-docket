@@ -11,3 +11,5 @@ keywords = ["cli", "todo"]
 categories = ["command-line-utilities"]
 
 [dependencies]
+clap = { version = "3.2.17", features = ["derive"] }
+termcolor = "1.1.3" # same as clap
