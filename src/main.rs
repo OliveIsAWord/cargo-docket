@@ -3,6 +3,7 @@
 
 #[macro_use]
 mod cute_error;
+mod parse;
 
 use clap::{Parser, Subcommand};
 use std::env;
@@ -43,6 +44,8 @@ enum Action {
 }
 
 fn main() -> ExitCode {
+    let tryy = "meow meow!!\n this is a coool string :3 \n\r\n\n\runix windows unix mac";
+    dbg!(parse::parse(tryy));
     let (is_via_cargo, args) = {
         // Skip the executable path
         let mut args = env::args_os().skip(1).peekable();
@@ -66,7 +69,10 @@ fn main() -> ExitCode {
         Ok(opt) => opt,
         Err(e) => {
             let _ignore = e.print();
-            yeet!()
+            if e.use_stderr() {
+                yeet!()
+            }
+            return ExitCode::SUCCESS;
         }
     };
     debug_println!("done parsing: {:?}", args);
