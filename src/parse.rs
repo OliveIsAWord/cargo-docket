@@ -2,8 +2,8 @@
 pub enum TokenKind<'a> {
     Text(&'a str),
     Newline(Newline),
-    Heading { level: u8, text: &'a str },
-    // Comment(&'a str),
+    Heading { level: usize, text: &'a str },
+    Comment(MultilineText<'a>),
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -14,6 +14,17 @@ pub enum Newline {
     Windows,
     // The character `\r` not immediately followed by `\n`.
     Mac,
+}
+
+#[derive(Debug, Default, Eq, PartialEq)]
+pub struct MultilineText<'a> {
+    t: Vec<Result<&'a str, Newline>>,
+}
+
+impl<'a> MultilineText<'a> {
+    pub fn new(text: &'a str) -> Self {
+        Self { t: vec![Ok(text)] }
+    }
 }
 
 pub fn parse(source: &str) -> Vec<TokenKind<'_>> {
@@ -44,17 +55,17 @@ pub fn parse(source: &str) -> Vec<TokenKind<'_>> {
                 dbg!(i);
                 match tokens.last() {
                     None | Some(Kind::Newline(_)) if text_start == i => {
-                        let mut level: u8 = 0;
+                        let mut level = 0;
                         // Don't advance
                         let mut try_iter = source[i + 1..].chars().peekable();
                         while try_iter.next_if_eq(&'#').is_some() {
                             level += 1;
                         }
-                        let level = level; // end mutability
-                        // Ignore any hash characters if there is no space following it.
+                        let level = level; // cease mutability
+                                           // Ignore any hash characters if there is no space following it.
                         if try_iter.next() == Some(' ') {
                             let (start_index, skip_char) = iter
-                                .nth(usize::from(level))
+                                .nth(level)
                                 .expect("should not reach end of source");
                             debug_assert_eq!(skip_char, ' ');
                             let mut end_index = start_index;
@@ -66,10 +77,52 @@ pub fn parse(source: &str) -> Vec<TokenKind<'_>> {
                             text_start = end_index + 1;
                             Some(Kind::Heading { level, text })
                         } else {
+                            // TODO: should we unconditionally advance the main iter?
+                            // if level > 0 {
+                            //     let _ = iter
+                            //         .nth(usize::from(level - 1))
+                            //         .expect("should not reach end of source");
+                            // }
                             None
                         }
                     }
                     _ => None,
+                }
+            }
+            '<' => {
+                let mut is_comment = true;
+                for cc in "!--".chars() {
+                    if iter.next_if(|&(_, c)| c == cc).is_none() {
+                        is_comment = false;
+                        break;
+                    }
+                }
+                if is_comment {
+                    let mut start = None;
+                    let mut end = 0;
+                    let mut exhausted = true;
+                    for (i, c) in iter.by_ref() {
+                        if start.is_none() {
+                            start = Some(i);
+                        }
+                        end = i;
+                        // TODO: This is awful, fix
+                        if c == '>' {
+                            exhausted = false;
+                            break;
+                        }
+                    }
+                    if exhausted {
+                        None
+                    } else {
+                        Some(Kind::Comment(
+                            start
+                                .map(|s| MultilineText::new(&source[s..end - 2]))
+                                .unwrap_or_default(),
+                        ))
+                    }
+                } else {
+                    None
                 }
             }
             _ => None,
@@ -125,6 +178,31 @@ mod tests {
                 },
                 Kind::Newline(Mac),
                 Kind::Text("cool")
+            ]
+        );
+    }
+
+    #[test]
+    fn subheadings() {
+        assert_eq!(
+            parse("## hi"),
+            vec![Kind::Heading {
+                level: 1,
+                text: "hi"
+            },]
+        );
+    }
+
+    #[test]
+    fn comment() {
+        assert_eq!(
+            parse("text1<!--text2\ntext3-->text4"),
+            vec![
+                Kind::Text("text1"),
+                Kind::Comment(MultilineText {
+                    t: vec![Ok("text2\ntext3")]
+                }),
+                Kind::Text("text4")
             ]
         );
     }
