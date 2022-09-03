@@ -1,5 +1,4 @@
 #![forbid(unsafe_code)]
-#![allow(dead_code, unused_imports)]
 
 #[macro_use]
 mod cute_error;
@@ -154,10 +153,11 @@ fn yes_no(msg: &str, default_answer: Option<bool>) -> io::Result<bool> {
             Some('y') => return Ok(true),
             Some('n') => return Ok(false),
             Some(_) => writeln!(stderr, "unrecognized character")?,
-            None => match default_answer {
-                Some(answer) => return Ok(answer),
-                None => (),
-            },
+            None => {
+                if let Some(answer) = default_answer {
+                    return Ok(answer);
+                }
+            }
         }
     }
     Err(io::ErrorKind::TimedOut.into())
